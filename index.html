@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Piyano Nota Yazıcı</title>
+
+  <!-- VexFlow: tarayıcıda nota çizmeyi sağlayan kütüphane -->
+  <script src="https://unpkg.com/vexflow@4.2.6/build/cjs/vexflow.js"></script>
+
+  <style>
+    /* ── Sıfırlama ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Genel Sayfa ── */
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #edeae4;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+
+    /* ── Başlık Çubuğu ── */
+    .app-header {
+      background: #1b1b2f;
+      color: #fff;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.35);
+    }
+    .app-header h1      { font-size: 1.25rem; font-weight: 700; letter-spacing: .3px; }
+    .app-header .sub    { font-size: .75rem; color: #9ca3af; margin-top: 2px; }
+
+    /* ── Kontrol Çubuğu ── */
+    .control-bar {
+      background: #fff;
+      padding: 12px 28px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: flex-end;
+      border-bottom: 1px solid #ddd;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 2px 6px rgba(0,0,0,.06);
+    }
+    .ctrl { display: flex; flex-direction: column; gap: 4px; }
+    .ctrl label {
+      font-size: .68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: #6b7280;
+    }
+    .ctrl select,
+    .ctrl input[type="number"] {
+      padding: 7px 10px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 7px;
+      font-size: .95rem;
+      width: 115px;
+      background: #f9fafb;
+      color: #1a1a1a;
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+      -moz-appearance: textfield;
+    }
+    .ctrl input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
+    .ctrl select:focus,
+    .ctrl input:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,.15);
+    }
+
+    .btn-apply {
+      padding: 8px 22px;
+      background: #1b1b2f;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: .3px;
+      transition: background .15s, transform .1s;
+      align-self: flex-end;
+    }
+    .btn-apply:hover  { background: #2d2d54; }
+    .btn-apply:active { transform: scale(.97); }
+
+    /* ── Nota Alanı ── */
+    .notation-wrapper {
+      padding: 32px 28px;
+      overflow-x: auto;
+    }
+    .notation-card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.1);
+      padding: 28px 20px 20px;
+      display: inline-block;
+      min-width: 600px;
+    }
+    .notation-card svg { display: block; }
+
+    /* ── Hata Kutusu ── */
+    .error-box {
+      padding: 14px 18px;
+      background: #fef2f2;
+      border: 1.5px solid #fca5a5;
+      border-radius: 8px;
+      color: #dc2626;
+      font-size: .9rem;
+      max-width: 520px;
+      line-height: 1.5;
+    }
+
+    /* ── Yardım Notu ── */
+    .help-note {
+      margin-top: 16px;
+      font-size: .8rem;
+      color: #9ca3af;
+      max-width: 700px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- ═══════════════════════════ BAŞLIK ═══════════════════════════ -->
+<header class="app-header">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+       stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="4" width="20" height="16" rx="2"/>
+    <path d="M6 4v4M10 4v2M14 4v4M18 4v2"/>
+  </svg>
+  <div>
+    <h1>Piyano Nota Yazıcı</h1>
+    <div class="sub">Grand Staff Editörü &mdash; v1.0</div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════ KONTROLLER ═══════════════════════ -->
+<div class="control-bar">
+
+  <div class="ctrl">
+    <label>Zaman İmzası</label>
+    <select id="timeSig">
+      <option value="4/4" selected>4/4</option>
+      <option value="3/4">3/4</option>
+      <option value="2/4">2/4</option>
+      <option value="2/2">2/2</option>
+      <option value="6/8">6/8</option>
+      <option value="12/8">12/8</option>
+    </select>
+  </div>
+
+  <div class="ctrl">
+    <label>Ölçü Sayısı</label>
+    <input type="number" id="numMeasures" value="8" min="1" max="64" />
+  </div>
+
+  <div class="ctrl">
+    <label>Satır Başı Ölçü</label>
+    <input type="number" id="measuresPerLine" value="4" min="1" max="10" />
+  </div>
+
+  <div class="ctrl">
+    <label>Tempo (BPM)</label>
+    <input type="number" id="tempo" value="120" min="20" max="300" />
+  </div>
+
+  <button class="btn-apply" onclick="renderScore()">&#9654; Uygula</button>
+</div>
+
+<!-- ═══════════════════════════ NOTA ALANI ════════════════════════ -->
+<div class="notation-wrapper">
+  <div class="notation-card" id="notation">
+    <!-- VexFlow burayı dolduracak -->
+  </div>
+  <p class="help-note">
+    &#9432; Ayarları değiştirdikten sonra <strong>Uygula</strong> butonuna basın.
+    Herhangi bir sorun olursa ekrandaki hata mesajının tamamını kopyalayıp paylaşın.
+  </p>
+</div>
+
+<!-- ═══════════════════════════ JAVASCRIPT ═══════════════════════ -->
+<script>
+(function () {
+
+  /* ── Düzen Sabitleri (piksel) ─────────────────────────────────── */
+  var MARGIN_LEFT   = 20;   // sol kenar boşluğu
+  var MARGIN_TOP    = 52;   // üst boşluk (tempo yazısı için)
+  var MARGIN_RIGHT  = 30;   // sağ kenar boşluğu
+  var MEASURE_W     = 175;  // her ölçünün genişliği
+  var FIRST_EXTRA   = 88;   // ilk ölçüye ekstra: anahtar + zaman imzası
+  var TREBLE_Y      = 0;    // sol el dizesinin sistemdeki y konumu
+  var BASS_Y        = 108;  // sağ el (fa anahtarı) dizesinin y konumu
+  var LINE_SPACING  = 205;  // iki satır arasındaki dikey mesafe
+
+  /* ── Giriş Değerlerini Oku ────────────────────────────────────── */
+  function getValues() {
+    return {
+      numMeasures    : clamp(parseInt(document.getElementById('numMeasures').value)    || 8,  1, 64),
+      measuresPerLine: clamp(parseInt(document.getElementById('measuresPerLine').value) || 4,  1, 10),
+      timeSignature  : document.getElementById('timeSig').value,
+      tempo          : clamp(parseInt(document.getElementById('tempo').value)           || 120, 20, 300),
+    };
+  }
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  /* ── Ana Render Fonksiyonu ────────────────────────────────────── */
+  window.renderScore = function () {
+    var vals            = getValues();
+    var numMeasures     = vals.numMeasures;
+    var measuresPerLine = vals.measuresPerLine;
+    var timeSignature   = vals.timeSignature;
+    var tempo           = vals.tempo;
+
+    var container = document.getElementById('notation');
+    container.innerHTML = '';
+
+    /* VexFlow yüklendi mi? */
+    if (typeof Vex === 'undefined' || !Vex.Flow) {
+      container.innerHTML = '<div class="error-box">'
+        + '<strong>VexFlow kütüphanesi yüklenemedi.</strong><br>'
+        + 'İnternet bağlantınızı kontrol edin ve sayfayı yenileyin (F5).'
+        + '</div>';
+      return;
+    }
+
+    try {
+      var VF       = Vex.Flow;
+      var numLines = Math.ceil(numMeasures / measuresPerLine);
+
+      /* Tuval boyutunu hesapla */
+      var lineW      = FIRST_EXTRA + MEASURE_W + (measuresPerLine - 1) * MEASURE_W;
+      var canvasW    = MARGIN_LEFT + lineW + MARGIN_RIGHT;
+      var canvasH    = MARGIN_TOP  + numLines * LINE_SPACING + 70;
+
+      var renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
+      renderer.resize(canvasW, canvasH);
+      var ctx = renderer.getContext();
+
+      var measureCount = 0;
+
+      for (var line = 0; line < numLines; line++) {
+        if (measureCount >= numMeasures) break;
+
+        var sysY        = MARGIN_TOP + line * LINE_SPACING;
+        var trebleY     = sysY + TREBLE_Y;
+        var bassY       = sysY + BASS_Y;
+        var inLine      = Math.min(measuresPerLine, numMeasures - measureCount);
+        var isLastLine  = (line === numLines - 1);
+
+        var x           = MARGIN_LEFT;
+        var firstTreble = null, firstBass = null;
+        var lastTreble  = null, lastBass  = null;
+
+        /* ── Her ölçüyü çiz ── */
+        for (var m = 0; m < inLine; m++) {
+          var isFirst = (m === 0);
+          var mWidth  = isFirst ? MEASURE_W + FIRST_EXTRA : MEASURE_W;
+
+          /* Sol el dizesi (treble = Sol anahtarı) */
+          var treble = new VF.Stave(x, trebleY, mWidth);
+          if (isFirst) treble.addClef('treble').addTimeSignature(timeSignature);
+          treble.setContext(ctx).draw();
+
+          /* Sağ el dizesi (bass = Fa anahtarı) */
+          var bass = new VF.Stave(x, bassY, mWidth);
+          if (isFirst) bass.addClef('bass').addTimeSignature(timeSignature);
+          bass.setContext(ctx).draw();
+
+          if (isFirst)  { firstTreble = treble; firstBass = bass; }
+          lastTreble = treble; lastBass = bass;
+
+          x += mWidth;
+          measureCount++;
+        }
+
+        /* ── Sol Bağlantılar: Parantez (brace) + dikey çizgi ── */
+        new VF.StaveConnector(firstTreble, firstBass)
+          .setType(VF.StaveConnector.type.BRACE)
+          .setContext(ctx).draw();
+
+        new VF.StaveConnector(firstTreble, firstBass)
+          .setType(VF.StaveConnector.type.SINGLE_LEFT)
+          .setContext(ctx).draw();
+
+        /* ── Sağ Bağlantı: Son satırda çift kalın çizgi ── */
+        var rightType = isLastLine
+          ? VF.StaveConnector.type.BOLD_DOUBLE_RIGHT
+          : VF.StaveConnector.type.SINGLE_RIGHT;
+
+        new VF.StaveConnector(lastTreble, lastBass)
+          .setType(rightType)
+          .setContext(ctx).draw();
+      }
+
+      /* ── Tempo Yazısı (SVG'ye doğrudan eklenir) ── */
+      var svg = container.querySelector('svg');
+      if (svg) {
+        var txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        txt.setAttribute('x', String(MARGIN_LEFT + 4));
+        txt.setAttribute('y', String(MARGIN_TOP - 16));
+        txt.setAttribute('font-family', 'Georgia, serif');
+        txt.setAttribute('font-size', '15');
+        txt.setAttribute('font-weight', 'bold');
+        txt.setAttribute('fill', '#1a1a1a');
+        txt.textContent = '♩ = ' + tempo;  /* ♩ = BPM */
+        svg.appendChild(txt);
+      }
+
+    } catch (err) {
+      container.innerHTML = '<div class="error-box">'
+        + '<strong>Bir hata oluştu:</strong><br>'
+        + err.message
+        + '<br><br><small>Bu mesajın tamamını kopyalayıp yapay zekaya gönderin.</small>'
+        + '</div>';
+      console.error('VexFlow hatası:', err);
+    }
+  };
+
+  /* ── Sayfa yüklenince ve input değişince otomatik render ── */
+  window.addEventListener('load', renderScore);
+  document.querySelectorAll('.control-bar input, .control-bar select')
+    .forEach(function (el) { el.addEventListener('change', renderScore); });
+
+})();
+</script>
+
+</body>
+</html>
